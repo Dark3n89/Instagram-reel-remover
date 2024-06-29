@@ -11,7 +11,7 @@
 (function() {
     'use strict';
 
-    // Multilanguage support for "Next card" button
+    // Multijazyčná podpora pro tlačítko "Další karta"
     const multilangNextButton = {
         'en': 'Next card',   // Angličtina
         'cs': 'Další karta', // Čeština
@@ -26,7 +26,7 @@
         // Přidávejte další jazyky podle potřeby
     };
 
-    // Function to save skipped URL
+    // Funkce pro uložení přeskočené URL
     function saveSkippedURL(url) {
         let skippedURLs = JSON.parse(localStorage.getItem('skippedURLs')) || [];
         if (!skippedURLs.includes(url)) {
@@ -37,47 +37,47 @@
         }
     }
 
-    // Function to get all skipped URLs
+    // Funkce pro načtení všech přeskočených URL
     function getSkippedURLs() {
         return JSON.parse(localStorage.getItem('skippedURLs')) || [];
     }
 
-    // Function to check if URL is skipped
+    // Funkce pro kontrolu, zda je URL přeskočená
     function isURLSkipped(url) {
         let skippedURLs = getSkippedURLs();
         return skippedURLs.includes(url);
     }
 
-    // Function to detect browser language
+    // Funkce pro detekci jazyka pro tlačítko "Další karta"
     function detectBrowserLanguage() {
         return navigator.language || navigator.userLanguage || 'en';
     }
 
-    // Function to update the skipped count badge
+    // Funkce pro aktualizaci počtu přeskočených videí na badge
     function updateSkippedCountBadge(count) {
         let badge = document.getElementById('skippedCountBadge');
         if (!badge) {
             badge = document.createElement('div');
             badge.id = 'skippedCountBadge';
             badge.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background-color: #007bff; color: #fff; border-radius: 50%; padding: 5px; cursor: pointer; z-index: 9999; display: none;';
-            badge.title = 'Total skipped Instagram Reels';
+            badge.title = 'Celkový počet přeskočených Instagram Reels';
             document.body.appendChild(badge);
         }
         badge.textContent = count;
     }
 
-    // Function to show badge and automatically hide it after a short delay
+    // Funkce pro zobrazení badge a automatické skrytí po krátké době
     function showAndAutoHideBadge() {
         let badge = document.getElementById('skippedCountBadge');
         if (badge) {
             badge.style.display = 'block';
             setTimeout(() => {
                 badge.style.display = 'none';
-            }, 4000); // Hide badge after 4 seconds
+            }, 4000); // Skryje badge po 4 sekundách
         }
     }
 
-    // Function to export skipped URLs to a text file
+    // Funkce pro export přeskočených URL do textového souboru
     function exportSkippedURLs() {
         let skippedURLs = getSkippedURLs();
         let blob = new Blob([skippedURLs.join('\n')], { type: 'text/plain' });
@@ -91,13 +91,14 @@
         window.URL.revokeObjectURL(url);
     }
 
+    // Funkce pro přeskočení Instagram obsahu
     function skipInstagramContent() {
         if (window.location.href.includes("/reel/")) {
             if (isURLSkipped(window.location.href)) {
-                // If URL is already skipped, click on the "Next card" button
+                // Pokud je URL již přeskočená, klikne na tlačítko "Další karta"
                 let nextButton = findNextButton();
                 if (nextButton) {
-                    console.log("Skipping already skipped URL:", window.location.href);
+                    console.log("Přeskakuji již přeskočenou URL:", window.location.href);
                     nextButton.click();
                 }
                 return;
@@ -105,27 +106,27 @@
 
             let foundInstagramContent = false;
 
-            // Check visible elements containing the word "Instagram"
+            // Kontrola viditelných elementů obsahujících slovo "Instagram"
             document.querySelectorAll('*').forEach(function(node) {
                 if (node.offsetParent !== null && node.innerText && node.innerText.includes("Instagram")) {
-                    console.log("Found Instagram content in text:", node);
+                    console.log("Nalezen obsah Instagramu v textu:", node);
                     foundInstagramContent = true;
                 }
             });
 
-            // Check visible images containing the specified URL
+            // Kontrola viditelných obrázků obsahujících zadanou URL
             document.querySelectorAll('img').forEach(function(img) {
                 if (img.offsetParent !== null && img.src.includes('https://static.xx.fbcdn.net/rsrc.php/v3/yy/r/1M3EBv90kJA.png')) {
-                    console.log("Found Instagram content in image:", img);
+                    console.log("Nalezen obsah Instagramu v obrázku:", img);
                     foundInstagramContent = true;
                 }
             });
 
-            // If Instagram content is found, click on "Next card" and save URL
+            // Pokud je nalezen obsah Instagramu, klikne na "Další karta" a uloží URL
             if (foundInstagramContent) {
                 let nextButton = findNextButton();
                 if (nextButton) {
-                    console.log("Clicking next button:", nextButton);
+                    console.log("Klikám na tlačítko 'Další karta':", nextButton);
                     saveSkippedURL(window.location.href);
                     nextButton.click();
                 }
@@ -133,22 +134,22 @@
         }
     }
 
-    // Function to find the "Next card" button based on language
+    // Funkce pro nalezení tlačítka "Další karta" podle jazyka
     function findNextButton() {
-        let language = detectBrowserLanguage().split('-')[0]; // Extract language code
+        let language = detectBrowserLanguage().split('-')[0]; // Extrahuje jazykový kód
         let ariaLabel = multilangNextButton[language];
         if (ariaLabel) {
             return document.querySelector(`[aria-label="${ariaLabel}"]`);
         } else {
-            console.warn(`No translation found for language: ${language}`);
+            console.warn(`Žádný překlad pro jazyk: ${language}`);
             return null;
         }
     }
 
-    // Initialize check on page load
+    // Inicializace kontroly při načtení stránky
     skipInstagramContent();
 
-    // Observe DOM changes and apply function to newly loaded posts
+    // Pozorování změn DOM a aplikace funkce na nově načtené příspěvky
     const observer = new MutationObserver(skipInstagramContent);
     observer.observe(document.body, { childList: true, subtree: true });
 })();
