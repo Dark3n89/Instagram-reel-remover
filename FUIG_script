@@ -11,6 +11,8 @@
 (function() {
     'use strict';
 
+    const reelDurationMinutes = 2;
+
     // Vícejazyčná podpora pro tlačítko "Další karta"
     const multilangNextButton = {
         'en': 'Next card',   // Angličtina
@@ -25,6 +27,28 @@
         'ja': '次のカード',   // Japonština
         // Přidávejte další jazyky podle potřeby
     };
+
+    // Vícejazyčná podpora pro text v badge
+    const multilangBadgeText = {
+        'en': 'Skipped (count) IG reels, this script saved you (time) minutes.',
+        'cs': 'Přeskočeno (count) IG reelů, tento skript vám ušetřil (time) minut.',
+        'sk': 'Preskočených (count) IG reelov, tento skript vám ušetril (time) minút.',
+        'fr': '(count) IG reels ignorés, ce script vous a fait gagner (time) minutes.',
+        'es': 'Saltado (count) IG reels, este script te ahorró (time) minutos.',
+        'de': '(count) IG-Reels übersprungen, dieses Skript hat Ihnen (time) Minuten gespart.',
+        'it': 'Saltato (count) IG reels, questo script ti ha fatto risparmiare (time) minuti.',
+        'pt': 'Ignorado (count) IG reels, este script te poupou (time) minutos.',
+        'ru': 'Пропущено (count) IG рилов, этот скрипт сэкономил вам (time) минут.',
+        'ja': 'スキップされた (count) IGリール、このスクリプトはあなたの時間を (time) 分節約しました。',
+        // Přidávejte další jazyky podle potřeby
+    };
+
+    // Funkce pro získání textu pro badge
+    function getBadgeText(count, time) {
+        let language = detectBrowserLanguage().split('-')[0];
+        let template = multilangBadgeText[language] || multilangBadgeText['en'];
+        return template.replace('(count)', count).replace('(time)', time);
+    }
 
     // Funkce pro uložení přeskočené URL
     function saveSkippedURL(url) {
@@ -59,19 +83,20 @@
         return navigator.language || navigator.userLanguage || 'en';
     }
 
-    // Funkce pro aktualizaci odznaku s počtem přeskočených URL
+    // Funkce pro aktualizaci odznaku s počtem přeskočených URL a ušetřeným časem
     function updateSkippedCountBadge(count) {
+        let savedTime = count * reelDurationMinutes;
         let badge = document.getElementById('skippedCountBadge');
         if (!badge) {
             badge = document.createElement('div');
             badge.id = 'skippedCountBadge';
-            badge.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background-color: #007bff; color: #fff; border-radius: 50%; padding: 5px; cursor: pointer; z-index: 9999;';
-            badge.title = 'Celkový počet přeskočených Instagram Reels';
+            badge.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background-color: #007bff; color: #fff; border-radius: 10px; padding: 10px; cursor: pointer; z-index: 9999;';
+            badge.title = 'Celkový počet přeskočených Instagram Reels a ušetřený čas';
             badge.onclick = exportSkippedURLs;
             document.body.appendChild(badge);
         }
-        badge.textContent = count;
-        console.log("Aktualizován odznak s počtem:", count);
+        badge.textContent = getBadgeText(count, savedTime);
+        console.log("Aktualizován odznak s počtem a ušetřeným časem:", count, savedTime);
     }
 
     // Funkce pro zobrazení odznaku a jeho automatické skrytí po krátké době
@@ -81,7 +106,7 @@
             badge.style.display = 'block';
             setTimeout(() => {
                 badge.style.display = 'none';
-            }, 5000); // Skrytí odznaku po 5 sekundách
+            }, 4000); // Skrytí odznaku po 4 sekundách
         }
     }
 
@@ -192,4 +217,10 @@
         localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
         console.log("Ukládání URL při zavření okna.", skippedURLs);
     });
+
+    // Přidání kontroly, zda nebyly URL vymazány
+    setInterval(() => {
+        let skippedURLs = getSkippedURLs();
+        console.log("Pravidelná kontrola uložených URL: ", skippedURLs);
+    }, 5000); // Kontrola každých 5 sekund
 })();
