@@ -1,31 +1,31 @@
 // ==UserScript==
-// @name         Skip Instagram Content on Facebook Reels with URL Tracking
+// @name         Skip Instagram Content on Facebook Reels with IndexedDB
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Automatically skip URLs that have been previously skipped and click "Next" if Instagram content is detected on Facebook Reels. Displays total skipped reels count in a popup and allows exporting skipped URLs to a text file.
+// @version      1.2
+// @description  Automatically skip URLs that have been previously skipped and click "Next" if Instagram content is detected on Facebook Reels. Displays total skipped reels count in a popup and allows exporting skipped URLs to a text file using IndexedDB for storage.
 // @author       Projekt Darkside - Brno city Bohemia
 // @match        https://www.facebook.com/*
 // @grant        none
 // ==/UserScript==
 
-(function() {
+(async function() {
     'use strict';
 
     const reelDurationMinutes = 2;
+    let db;
 
     // Vícejazyčná podpora pro tlačítko "Další karta"
     const multilangNextButton = {
-        'en': 'Next card',   // Angličtina
-        'cs': 'Další karta', // Čeština
-        'sk': 'Ďalšia karta', // Slovenština
-        'fr': 'Carte suivante', // Francouzština
-        'es': 'Siguiente tarjeta', // Španělština
-        'de': 'Nächste Karte', // Němčina
-        'it': 'Prossima carta', // Italština
-        'pt': 'Próximo cartão', // Portugalština
-        'ru': 'Следующая карта', // Ruština
-        'ja': '次のカード',   // Japonština
-        // Přidávejte další jazyky podle potřeby
+        'en': 'Next card',
+        'cs': 'Další karta',
+        'sk': 'Ďalšia karta',
+        'fr': 'Carte suivante',
+        'es': 'Siguiente tarjeta',
+        'de': 'Nächste Karte',
+        'it': 'Prossima carta',
+        'pt': 'Próximo cartão',
+        'ru': 'Следующая карта',
+        'ja': '次のカード',
     };
 
     // Vícejazyčná podpora pro text v badge
@@ -40,51 +40,92 @@
         'pt': 'Ignorado (count) IG reels, este script te poupou (time) minutos.',
         'ru': 'Пропущено (count) IG рилов, этот скрипт сэкономил вам (time) минут.',
         'ja': 'スキップされた (count) IGリール、このスクリプトはあなたの時間を (time) 分節約しました。',
-        // Přidávejte další jazyky podle potřeby
     };
 
-    // Funkce pro získání textu pro badge
+    async function openDatabase() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('InstagramReelsDB', 1);
+
+            request.onupgradeneeded = function(event) {
+                db = event.target.result;
+                if (!db.objectStoreNames.contains('skippedURLs')) {
+                    db.createObjectStore('skippedURLs', { keyPath: 'url' });
+                }
+            };
+
+            request.onsuccess = function(event) {
+                db = event.target.result;
+                resolve(db);
+            };
+
+            request.onerror = function(event) {
+                reject('Error opening database: ' + event.target.errorCode);
+            };
+        });
+    }
+
+    async function saveSkippedURL(url) {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['skippedURLs'], 'readwrite');
+            const objectStore = transaction.objectStore('skippedURLs');
+            const request = objectStore.add({ url: url });
+
+            request.onsuccess = function(event) {
+                updateSkippedCountBadge();
+                resolve(event.target.result);
+            };
+
+            request.onerror = function(event) {
+                if (event.target.error.name === 'ConstraintError') {
+                    resolve(false); // URL již existuje
+                } else {
+                    reject('Error saving URL: ' + event.target.error);
+                }
+            };
+        });
+    }
+
+    async function getSkippedURLs() {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['skippedURLs']);
+            const objectStore = transaction.objectStore('skippedURLs');
+            const request = objectStore.getAll();
+
+            request.onsuccess = function(event) {
+                resolve(event.target.result);
+            };
+
+            request.onerror = function(event) {
+                reject('Error getting URLs: ' + event.target.error);
+            };
+        });
+    }
+
+    async function isURLSkipped(url) {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['skippedURLs']);
+            const objectStore = transaction.objectStore('skippedURLs');
+            const request = objectStore.get(url);
+
+            request.onsuccess = function(event) {
+                resolve(!!event.target.result);
+            };
+
+            request.onerror = function(event) {
+                reject('Error checking URL: ' + event.target.error);
+            };
+        });
+    }
+
     function getBadgeText(count, time) {
         let language = detectBrowserLanguage().split('-')[0];
         let template = multilangBadgeText[language] || multilangBadgeText['en'];
         return template.replace('(count)', count).replace('(time)', time);
     }
 
-    // Funkce pro uložení přeskočené URL
-    function saveSkippedURL(url) {
-        let skippedURLs = JSON.parse(sessionStorage.getItem('skippedURLs')) || [];
-        console.log("Před uložením: ", skippedURLs);
-        if (!skippedURLs.includes(url)) {
-            skippedURLs.push(url);
-            sessionStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
-            localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
-            updateSkippedCountBadge(skippedURLs.length);
-            showAndAutoHideBadge();
-            console.log("URL uložena:", url);
-            console.log("Po uložení: ", JSON.parse(sessionStorage.getItem('skippedURLs')));
-        }
-    }
-
-    // Funkce pro získání všech přeskočených URL
-    function getSkippedURLs() {
-        let skippedURLs = JSON.parse(sessionStorage.getItem('skippedURLs')) || [];
-        console.log("Načtené přeskočené URL:", skippedURLs);
-        return skippedURLs;
-    }
-
-    // Funkce pro kontrolu, zda je URL přeskočená
-    function isURLSkipped(url) {
-        let skippedURLs = getSkippedURLs();
-        return skippedURLs.includes(url);
-    }
-
-    // Funkce pro detekci jazyka prohlížeče
-    function detectBrowserLanguage() {
-        return navigator.language || navigator.userLanguage || 'en';
-    }
-
-    // Funkce pro aktualizaci odznaku s počtem přeskočených URL a ušetřeným časem
-    function updateSkippedCountBadge(count) {
+    async function updateSkippedCountBadge() {
+        let skippedURLs = await getSkippedURLs();
+        let count = skippedURLs.length;
         let savedTime = count * reelDurationMinutes;
         let badge = document.getElementById('skippedCountBadge');
         if (!badge) {
@@ -96,42 +137,38 @@
             document.body.appendChild(badge);
         }
         badge.textContent = getBadgeText(count, savedTime);
-        console.log("Aktualizován odznak s počtem a ušetřeným časem:", count, savedTime);
     }
 
-    // Funkce pro zobrazení odznaku a jeho automatické skrytí po krátké době
     function showAndAutoHideBadge() {
         let badge = document.getElementById('skippedCountBadge');
         if (badge) {
             badge.style.display = 'block';
             setTimeout(() => {
                 badge.style.display = 'none';
-            }, 4000); // Skrytí odznaku po 4 sekundách
+            }, 4000);
         }
     }
 
-    // Funkce pro export přeskočených URL do textového souboru
-    function exportSkippedURLs() {
-        let skippedURLs = getSkippedURLs();
-        let blob = new Blob([skippedURLs.join('\n')], { type: 'text/plain' });
+    async function exportSkippedURLs() {
+        let skippedURLs = await getSkippedURLs();
+        let urls = skippedURLs.map(item => item.url);
+        let blob = new Blob([urls.join('\n')], { type: 'text/plain' });
         let url = URL.createObjectURL(blob);
         let a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = 'preskocene_url.txt';
+        a.download = 'skipped_urls.txt';
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
-        console.log("URL exportovány.");
     }
 
-    function skipInstagramContent() {
+    async function skipInstagramContent() {
         if (window.location.href.includes("/reel/")) {
-            if (isURLSkipped(window.location.href)) {
-                // Pokud je URL již přeskočená, klikněte na tlačítko "Další karta"
+            let isSkipped = await isURLSkipped(window.location.href);
+            if (isSkipped) {
                 let nextButton = findNextButton();
                 if (nextButton) {
-                    console.log("Přeskakuji již přeskočenou URL:", window.location.href);
                     nextButton.click();
                 }
                 return;
@@ -139,88 +176,53 @@
 
             let foundInstagramContent = false;
 
-            // Kontrola viditelných prvků obsahujících slovo "Instagram"
             document.querySelectorAll('*').forEach(function(node) {
                 if (node.offsetParent !== null && node.innerText && node.innerText.includes("Instagram")) {
-                    console.log("Nalezen obsah Instagramu v textu:", node);
                     foundInstagramContent = true;
                 }
             });
 
-            // Kontrola viditelných obrázků obsahujících specifikovanou URL
             document.querySelectorAll('img').forEach(function(img) {
                 if (img.offsetParent !== null && img.src.includes('https://static.xx.fbcdn.net/rsrc.php/v3/yy/r/1M3EBv90kJA.png')) {
-                    console.log("Nalezen obsah Instagramu v obrázku:", img);
                     foundInstagramContent = true;
                 }
             });
 
-            // Pokud je nalezen obsah Instagramu, klikněte na "Další karta" a uložte URL
             if (foundInstagramContent) {
                 let nextButton = findNextButton();
                 if (nextButton) {
-                    console.log("Klikání na tlačítko další:", nextButton);
-                    saveSkippedURL(window.location.href);
+                    await saveSkippedURL(window.location.href);
                     nextButton.click();
                 }
             }
         }
     }
 
-    // Funkce pro nalezení tlačítka "Další karta" na základě jazyka
     function findNextButton() {
-        let language = detectBrowserLanguage().split('-')[0]; // Extrahujte kód jazyka
+        let language = detectBrowserLanguage().split('-')[0];
         let ariaLabel = multilangNextButton[language];
         if (ariaLabel) {
             return document.querySelector(`[aria-label="${ariaLabel}"]`);
         } else {
-            console.warn(`Nenašel jsem překlad pro jazyk: ${language}`);
             return null;
         }
     }
 
-    // Načtení URL z localStorage při načtení stránky
-    window.addEventListener('load', () => {
-        let skippedURLs = JSON.parse(localStorage.getItem('skippedURLs')) || [];
-        sessionStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
-        console.log("Načítání URL při načtení stránky.", skippedURLs);
-        updateSkippedCountBadge(skippedURLs.length);
+    function detectBrowserLanguage() {
+        return navigator.language || navigator.userLanguage || 'en';
+    }
+
+    window.addEventListener('load', async () => {
+        await openDatabase();
+        await updateSkippedCountBadge();
     });
 
-    // Inicializace kontroly při načtení stránky
-    skipInstagramContent();
+    window.addEventListener('beforeunload', async () => {
+        await updateSkippedCountBadge();
+    });
 
-    // Sledování změn DOM a aplikace funkce na nově načtené příspěvky
     const observer = new MutationObserver(skipInstagramContent);
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Synchronizace dat při otevření nového okna nebo změně stránky
-    window.addEventListener('storage', (event) => {
-        if (event.key === 'skippedURLs') {
-            console.log("Synchronizace přeskočených URL:", event.newValue);
-            let skippedURLs = JSON.parse(event.newValue) || [];
-            sessionStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
-            updateSkippedCountBadge(skippedURLs.length);
-        }
-    });
-
-    // Ukládání URL do localStorage každých 30 sekund
-    setInterval(() => {
-        let skippedURLs = getSkippedURLs();
-        localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
-        console.log("Pravidelné ukládání URL do localStorage:", skippedURLs);
-    }, 30000); // Ukládání každých 30 sekund
-
-    // Ukládání URL při zavření okna nebo záložky
-    window.addEventListener('beforeunload', () => {
-        let skippedURLs = getSkippedURLs();
-        localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
-        console.log("Ukládání URL při zavření okna.", skippedURLs);
-    });
-
-    // Přidání kontroly, zda nebyly URL vymazány
-    setInterval(() => {
-        let skippedURLs = getSkippedURLs();
-        console.log("Pravidelná kontrola uložených URL: ", skippedURLs);
-    }, 5000); // Kontrola každých 5 sekund
+    skipInstagramContent();
 })();
