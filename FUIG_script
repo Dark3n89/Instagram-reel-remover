@@ -28,19 +28,22 @@
 
     // Funkce pro uložení přeskočené URL
     function saveSkippedURL(url) {
-        let skippedURLs = JSON.parse(localStorage.getItem('skippedURLs')) || [];
+        let skippedURLs = JSON.parse(sessionStorage.getItem('skippedURLs')) || [];
+        console.log("Před uložením: ", skippedURLs);
         if (!skippedURLs.includes(url)) {
             skippedURLs.push(url);
+            sessionStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
             localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
             updateSkippedCountBadge(skippedURLs.length);
             showAndAutoHideBadge();
             console.log("URL uložena:", url);
+            console.log("Po uložení: ", JSON.parse(sessionStorage.getItem('skippedURLs')));
         }
     }
 
     // Funkce pro získání všech přeskočených URL
     function getSkippedURLs() {
-        let skippedURLs = JSON.parse(localStorage.getItem('skippedURLs')) || [];
+        let skippedURLs = JSON.parse(sessionStorage.getItem('skippedURLs')) || [];
         console.log("Načtené přeskočené URL:", skippedURLs);
         return skippedURLs;
     }
@@ -62,7 +65,7 @@
         if (!badge) {
             badge = document.createElement('div');
             badge.id = 'skippedCountBadge';
-            badge.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background-color: #007bff; color: #fff; border-radius: 50%; padding: 5px; cursor: pointer; z-index: 9999; display: none;';
+            badge.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background-color: #007bff; color: #fff; border-radius: 50%; padding: 5px; cursor: pointer; z-index: 9999;';
             badge.title = 'Celkový počet přeskočených Instagram Reels';
             badge.onclick = exportSkippedURLs;
             document.body.appendChild(badge);
@@ -78,7 +81,7 @@
             badge.style.display = 'block';
             setTimeout(() => {
                 badge.style.display = 'none';
-            }, 4000); // Skrytí odznaku po 4 sekundách
+            }, 5000); // Skrytí odznaku po 5 sekundách
         }
     }
 
@@ -151,6 +154,14 @@
         }
     }
 
+    // Načtení URL z localStorage při načtení stránky
+    window.addEventListener('load', () => {
+        let skippedURLs = JSON.parse(localStorage.getItem('skippedURLs')) || [];
+        sessionStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
+        console.log("Načítání URL při načtení stránky.", skippedURLs);
+        updateSkippedCountBadge(skippedURLs.length);
+    });
+
     // Inicializace kontroly při načtení stránky
     skipInstagramContent();
 
@@ -162,14 +173,23 @@
     window.addEventListener('storage', (event) => {
         if (event.key === 'skippedURLs') {
             console.log("Synchronizace přeskočených URL:", event.newValue);
-            updateSkippedCountBadge(getSkippedURLs().length);
+            let skippedURLs = JSON.parse(event.newValue) || [];
+            sessionStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
+            updateSkippedCountBadge(skippedURLs.length);
         }
     });
 
-    // Načtení URL z localStorage při otevření nového okna
-    window.addEventListener('load', () => {
+    // Ukládání URL do localStorage každých 30 sekund
+    setInterval(() => {
         let skippedURLs = getSkippedURLs();
-        console.log("Načítání URL při otevření okna.", skippedURLs);
-        updateSkippedCountBadge(skippedURLs.length);
+        localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
+        console.log("Pravidelné ukládání URL do localStorage:", skippedURLs);
+    }, 30000); // Ukládání každých 30 sekund
+
+    // Ukládání URL při zavření okna nebo záložky
+    window.addEventListener('beforeunload', () => {
+        let skippedURLs = getSkippedURLs();
+        localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
+        console.log("Ukládání URL při zavření okna.", skippedURLs);
     });
 })();
