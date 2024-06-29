@@ -1,0 +1,146 @@
+// ==UserScript==
+// @name Skip Instagram Content on Facebook Reels with URL Tracking
+// @namespace Skip Instagram
+// @Version 1.0
+// @description Automatically skip URLs that have been previously skipped and click "Next" if Instagram content is detected on Facebook Reels. Displays total skipped reels count in a popup and allows exporting skipped URLs to a text file.
+// @author Projekt Darkside - Brno city Bohemia.
+// @match https://www.facebook.com/*
+// @grant none
+// ==/UserScript==
+
+(function() {
+'use strict';
+
+// Multilanguage support for "Next card" button
+const multilangNextButton = {
+    'en': 'Next card',
+    'cs': 'Další karta',
+    // Add more languages as needed
+};
+
+// Function to save skipped URL
+function saveSkippedURL(url) {
+    let skippedURLs = JSON.parse(localStorage.getItem('skippedURLs')) || [];
+    if (!skippedURLs.includes(url)) {
+        skippedURLs.push(url);
+        localStorage.setItem('skippedURLs', JSON.stringify(skippedURLs));
+        updateSkippedCountBadge(skippedURLs.length);
+        showAndAutoHideBadge();
+    }
+}
+
+// Function to get all skipped URLs
+function getSkippedURLs() {
+    return JSON.parse(localStorage.getItem('skippedURLs')) || [];
+}
+
+// Function to check if URL is skipped
+function isURLSkipped(url) {
+    let skippedURLs = getSkippedURLs();
+    return skippedURLs.includes(url);
+}
+
+// Function to detect browser language
+function detectBrowserLanguage() {
+    return navigator.language || navigator.userLanguage || 'en';
+}
+
+// Function to update the skipped count badge
+function updateSkippedCountBadge(count) {
+    let badge = document.getElementById('skippedCountBadge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.id = 'skippedCountBadge';
+        badge.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background-color: #007bff; color: #fff; border-radius: 50%; padding: 5px; cursor: pointer; z-index: 9999; display: none;';
+        badge.title = 'Total skipped Instagram Reels';
+        document.body.appendChild(badge);
+    }
+    badge.textContent = count;
+}
+
+// Function to show badge and automatically hide it after a short delay
+function showAndAutoHideBadge() {
+    let badge = document.getElementById('skippedCountBadge');
+    if (badge) {
+        badge.style.display = 'block';
+        setTimeout(() => {
+            badge.style.display = 'none';
+        }, 4000); // Hide badge after 4 seconds
+    }
+}
+
+// Function to export skipped URLs to a text file
+function exportSkippedURLs() {
+    let skippedURLs = getSkippedURLs();
+    let blob = new Blob([skippedURLs.join('\n')], { type: 'text/plain' });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = 'skipped_urls.txt';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function skipInstagramContent() {
+    if (window.location.href.includes("/reel/")) {
+        if (isURLSkipped(window.location.href)) {
+            // If URL is already skipped, click on the "Next card" button
+            let nextButton = findNextButton();
+            if (nextButton) {
+                console.log("Skipping already skipped URL:", window.location.href);
+                nextButton.click();
+            }
+            return;
+        }
+
+        let foundInstagramContent = false;
+
+        // Check visible elements containing the word "Instagram"
+        document.querySelectorAll('*').forEach(function(node) {
+            if (node.offsetParent !== null && node.innerText && node.innerText.includes("Instagram")) {
+                console.log("Found Instagram content in text:", node);
+                foundInstagramContent = true;
+            }
+        });
+
+        // Check visible images containing the specified URL
+        document.querySelectorAll('img').forEach(function(img) {
+            if (img.offsetParent !== null && img.src.includes('https://static.xx.fbcdn.net/rsrc.php/v3/yy/r/1M3EBv90kJA.png')) {
+                console.log("Found Instagram content in image:", img);
+                foundInstagramContent = true;
+            }
+        });
+
+        // If Instagram content is found, click on "Next card" and save URL
+        if (foundInstagramContent) {
+            let nextButton = findNextButton();
+            if (nextButton) {
+                console.log("Clicking next button:", nextButton);
+                saveSkippedURL(window.location.href);
+                nextButton.click();
+            }
+        }
+    }
+}
+
+// Function to find the "Next card" button based on language
+function findNextButton() {
+    let language = detectBrowserLanguage().split('-')[0]; // Extract language code
+    let ariaLabel = multilangNextButton[language];
+    if (ariaLabel) {
+        return document.querySelector(`[aria-label="${ariaLabel}"]`);
+    } else {
+        console.warn(`No translation found for language: ${language}`);
+        return null;
+    }
+}
+
+// Initialize check on page load
+skipInstagramContent();
+
+// Observe DOM changes and apply function to newly loaded posts
+const observer = new MutationObserver(skipInstagramContent);
+observer.observe(document.body, { childList: true, subtree: true });
+})();
