@@ -3,15 +3,16 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.0
 // @description  Automatically skip URLs that have been previously skipped and click "Next" if Instagram content is detected on Facebook Reels. Displays total skipped reels count in a popup and allows exporting skipped URLs to a text file.
-// @author       Your Name
+// @author       Projekt Darkside - Brno city Bohemia
 // @match        https://www.facebook.com/*
 // @grant        none
 // ==/UserScript==
 
+
 (function() {
     'use strict';
 
-    // Multijazyčná podpora pro tlačítko "Další karta"
+    // Vícejazyčná podpora pro tlačítko "Další karta"
     const multilangNextButton = {
         'en': 'Next card',   // Angličtina
         'cs': 'Další karta', // Čeština
@@ -37,7 +38,7 @@
         }
     }
 
-    // Funkce pro načtení všech přeskočených URL
+    // Funkce pro získání všech přeskočených URL
     function getSkippedURLs() {
         return JSON.parse(localStorage.getItem('skippedURLs')) || [];
     }
@@ -48,12 +49,12 @@
         return skippedURLs.includes(url);
     }
 
-    // Funkce pro detekci jazyka pro tlačítko "Další karta"
+    // Funkce pro detekci jazyka prohlížeče
     function detectBrowserLanguage() {
         return navigator.language || navigator.userLanguage || 'en';
     }
 
-    // Funkce pro aktualizaci počtu přeskočených videí na badge
+    // Funkce pro aktualizaci odznaku s počtem přeskočených URL
     function updateSkippedCountBadge(count) {
         let badge = document.getElementById('skippedCountBadge');
         if (!badge) {
@@ -61,19 +62,20 @@
             badge.id = 'skippedCountBadge';
             badge.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background-color: #007bff; color: #fff; border-radius: 50%; padding: 5px; cursor: pointer; z-index: 9999; display: none;';
             badge.title = 'Celkový počet přeskočených Instagram Reels';
+            badge.onclick = exportSkippedURLs;
             document.body.appendChild(badge);
         }
         badge.textContent = count;
     }
 
-    // Funkce pro zobrazení badge a automatické skrytí po krátké době
+    // Funkce pro zobrazení odznaku a jeho automatické skrytí po krátké době
     function showAndAutoHideBadge() {
         let badge = document.getElementById('skippedCountBadge');
         if (badge) {
             badge.style.display = 'block';
             setTimeout(() => {
                 badge.style.display = 'none';
-            }, 4000); // Skryje badge po 4 sekundách
+            }, 4000); // Skrytí odznaku po 4 sekundách
         }
     }
 
@@ -85,17 +87,16 @@
         let a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = 'skipped_urls.txt';
+        a.download = 'preskocene_url.txt';
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
     }
 
-    // Funkce pro přeskočení Instagram obsahu
     function skipInstagramContent() {
         if (window.location.href.includes("/reel/")) {
             if (isURLSkipped(window.location.href)) {
-                // Pokud je URL již přeskočená, klikne na tlačítko "Další karta"
+                // Pokud je URL již přeskočená, klikněte na tlačítko "Další karta"
                 let nextButton = findNextButton();
                 if (nextButton) {
                     console.log("Přeskakuji již přeskočenou URL:", window.location.href);
@@ -106,7 +107,7 @@
 
             let foundInstagramContent = false;
 
-            // Kontrola viditelných elementů obsahujících slovo "Instagram"
+            // Kontrola viditelných prvků obsahujících slovo "Instagram"
             document.querySelectorAll('*').forEach(function(node) {
                 if (node.offsetParent !== null && node.innerText && node.innerText.includes("Instagram")) {
                     console.log("Nalezen obsah Instagramu v textu:", node);
@@ -114,7 +115,7 @@
                 }
             });
 
-            // Kontrola viditelných obrázků obsahujících zadanou URL
+            // Kontrola viditelných obrázků obsahujících specifikovanou URL
             document.querySelectorAll('img').forEach(function(img) {
                 if (img.offsetParent !== null && img.src.includes('https://static.xx.fbcdn.net/rsrc.php/v3/yy/r/1M3EBv90kJA.png')) {
                     console.log("Nalezen obsah Instagramu v obrázku:", img);
@@ -122,11 +123,11 @@
                 }
             });
 
-            // Pokud je nalezen obsah Instagramu, klikne na "Další karta" a uloží URL
+            // Pokud je nalezen obsah Instagramu, klikněte na "Další karta" a uložte URL
             if (foundInstagramContent) {
                 let nextButton = findNextButton();
                 if (nextButton) {
-                    console.log("Klikám na tlačítko 'Další karta':", nextButton);
+                    console.log("Klikání na tlačítko další:", nextButton);
                     saveSkippedURL(window.location.href);
                     nextButton.click();
                 }
@@ -134,14 +135,14 @@
         }
     }
 
-    // Funkce pro nalezení tlačítka "Další karta" podle jazyka
+    // Funkce pro nalezení tlačítka "Další karta" na základě jazyka
     function findNextButton() {
-        let language = detectBrowserLanguage().split('-')[0]; // Extrahuje jazykový kód
+        let language = detectBrowserLanguage().split('-')[0]; // Extrahujte kód jazyka
         let ariaLabel = multilangNextButton[language];
         if (ariaLabel) {
             return document.querySelector(`[aria-label="${ariaLabel}"]`);
         } else {
-            console.warn(`Žádný překlad pro jazyk: ${language}`);
+            console.warn(`Nenašel jsem překlad pro jazyk: ${language}`);
             return null;
         }
     }
@@ -149,7 +150,7 @@
     // Inicializace kontroly při načtení stránky
     skipInstagramContent();
 
-    // Pozorování změn DOM a aplikace funkce na nově načtené příspěvky
+    // Sledování změn DOM a aplikace funkce na nově načtené příspěvky
     const observer = new MutationObserver(skipInstagramContent);
     observer.observe(document.body, { childList: true, subtree: true });
 })();
